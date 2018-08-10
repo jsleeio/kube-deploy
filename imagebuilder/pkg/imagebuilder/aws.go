@@ -126,14 +126,14 @@ func NewAWSCloud(ec2 *ec2.EC2, config *AWSConfig, useLocalhost bool) *AWSCloud {
 	}
 }
 
-func (a *AWSCloud) GetExtraEnv() (map[string]string, error) {
+func (c *AWSCloud) GetExtraEnv() (map[string]string, error) {
 	env := make(map[string]string)
 
-	if a.useLocalhost {
+	if c.useLocalhost {
 		return env, nil
 	}
 
-	credentials := a.ec2.Config.Credentials
+	credentials := c.ec2.Config.Credentials
 	if credentials == nil {
 		return nil, fmt.Errorf("unable to determine EC2 credentials")
 	}
@@ -146,7 +146,7 @@ func (a *AWSCloud) GetExtraEnv() (map[string]string, error) {
 	// AWS session credentials should not be passed through if an IAM role has
 	// been specified for the instance; it's extremely unlikely to be what the
 	// user wants.
-	if c.config.InstanceProfile == "" {
+	if a.config.InstanceProfile == "" {
 		env["AWS_ACCESS_KEY_ID"] = creds.AccessKeyID
 		env["AWS_SECRET_ACCESS_KEY"] = creds.SecretAccessKey
 		env["AWS_SESSION_TOKEN"] = creds.SessionToken
@@ -158,12 +158,12 @@ func (a *AWSCloud) GetExtraEnv() (map[string]string, error) {
 	return env, nil
 }
 
-func (a *AWSCloud) describeInstance(instanceID string) (*ec2.Instance, error) {
+func (c *AWSCloud) describeInstance(instanceID string) (*ec2.Instance, error) {
 	request := &ec2.DescribeInstancesInput{}
 	request.InstanceIds = []*string{&instanceID}
 
 	glog.V(2).Infof("AWS DescribeInstances InstanceId=%q", instanceID)
-	response, err := a.ec2.DescribeInstances(request)
+	response, err := c.ec2.DescribeInstances(request)
 	if err != nil {
 		return nil, fmt.Errorf("error making AWS DescribeInstances call: %v", err)
 	}
@@ -181,8 +181,8 @@ func (a *AWSCloud) describeInstance(instanceID string) (*ec2.Instance, error) {
 }
 
 // TerminateInstance terminates the specified instance
-func (a *AWSCloud) TerminateInstance(instanceID string) error {
-	if a.useLocalhost {
+func (c *AWSCloud) TerminateInstance(instanceID string) error {
+	if c.useLocalhost {
 		glog.Infof("Skipping termination as locahost")
 		return nil
 	}
@@ -191,12 +191,12 @@ func (a *AWSCloud) TerminateInstance(instanceID string) error {
 	request.InstanceIds = []*string{&instanceID}
 
 	glog.V(2).Infof("AWS TerminateInstances instanceID=%q", instanceID)
-	_, err := a.ec2.TerminateInstances(request)
+	_, err := c.ec2.TerminateInstances(request)
 	return err
 }
 
 // GetInstance returns the AWS instance matching our tags, or nil if not found
-func (a *AWSCloud) GetInstance() (Instance, error) {
+func (c *AWSCloud) GetInstance() (Instance, error) {
 	if a.useLocalhost {
 		return &LocalhostInstance{}, nil
 	}
@@ -320,13 +320,13 @@ func (c *AWSCloud) describeSubnet(subnetID string) (*ec2.Subnet, error) {
 }
 
 // TagResource adds AWS tags to the specified resource
-func (a *AWSCloud) TagResource(resourceId string, tags ...*ec2.Tag) error {
+func (c *AWSCloud) TagResource(resourceId string, tags ...*ec2.Tag) error {
 	request := &ec2.CreateTagsInput{}
 	request.Resources = aws.StringSlice([]string{resourceId})
 	request.Tags = tags
 
 	glog.V(2).Infof("AWS CreateTags Resource=%q", resourceId)
-	_, err := a.ec2.CreateTags(request)
+	_, err := c.ec2.CreateTags(request)
 	if err != nil {
 		return fmt.Errorf("error making AWS CreateTag call: %v", err)
 	}
@@ -508,7 +508,7 @@ func (c *AWSCloud) CreateInstance() (Instance, error) {
 }
 
 // FindImage finds a registered image, matching by the name tag
-func (a *AWSCloud) FindImage(imageName string) (Image, error) {
+func (c *AWSCloud) FindImage(imageName string) (Image, error) {
 	image, err := findAWSImage(a.ec2, imageName)
 	if err != nil {
 		return nil, err
@@ -533,8 +533,8 @@ func (a *AWSCloud) FindImage(imageName string) (Image, error) {
 	}
 
 	return &AWSImage{
-		ec2:     a.ec2,
-		region:  a.config.Region,
+		ec2:     c.ec2,
+		region:  c.config.Region,
 		imageID: imageID,
 
 		cachedImage: image,
